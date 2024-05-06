@@ -1,0 +1,476 @@
+import pandas as pd
+import gc
+import numpy as np
+import matplotlib.pyplot as plt
+from IPython.display import display
+%pip install seaborn
+import seaborn as sns
+%pip install scipy
+from scipy import stats
+from scipy.stats import ttest_ind
+from scipy.stats import chi2_contingency
+import scipy as sp
+
+
+
+%pip install pyshp
+%pip install geopandas
+import geopandas
+%pip install shapely
+import shapely
+%pip install plotly
+import plotly
+%pip install plotly-geo
+import plotly.figure_factory as ff
+%pip install nbformat 
+import nbformat
+import plotly.express as px
+import cartopy.crs
+import cartopy.feature
+import plotly.graph_objects as go
+
+places = pd.read_csv('PLACES.csv')
+dentist=pd.read_csv('DENTIST.csv')
+fips=pd.read_csv('FIPS.csv')
+popclass=pd.read_csv('POPCLASS.csv')
+pd.set_option('display.max_columns', None)
+
+places=places.loc[places['Short_Question_Text'].isin(['Dental Visit','Mental Health','Annual Checkup','General Health','Health Insurance'])]
+places = places.drop(places[places['StateDesc'] == 'United States'].index)
+places.drop(columns=['StateAbbr','Category','DataSource','Data_Value_Footnote_Symbol','Data_Value_Footnote','DataValueTypeID','Counties','States','MeasureId','Low_Confidence_Limit','High_Confidence_Limit','StateDesc','LocationName'], inplace=True)
+places=places.rename({'LocationID':'FULLFIPS'}, axis=1)
+places["FULLFIPS"] = places["FULLFIPS"].astype("string").str.zfill(5)
+places['Geolocation'] = places['Geolocation'].str.replace('POINT ', '')
+places['Geolocation'] = places['Geolocation'].astype(str).str.replace(r"\(|\)", "", regex=True)
+places[['long', 'lat']] = places['Geolocation'].str.split(' ', expand=True)
+
+
+
+fips=fips.rename({'FIPS State':'STATEFP', 'FIPS County':'COUNTYFP'}, axis=1)
+
+fips["STATEFP"] = fips["STATEFP"].astype("string").str.zfill(2)
+fips["COUNTYFP"] = fips["COUNTYFP"].astype("string").str.zfill(3)
+fips['FULLFIPS'] = fips['STATEFP'].astype(str) + fips['COUNTYFP']
+
+
+
+placesfips=pd.merge(places, fips, how="outer", on=['FULLFIPS'])
+placesfips=placesfips.dropna() 
+
+
+
+dentist.drop(columns=['popn_densty_per_squr_mi_10','popn_densty_per_squr_mi_20','fips_st_cnty','secndry_entity_file','st_name_abbrev','popn_21','st_name','cnty_name'], inplace=True)
+dentist=dentist.rename({'fips_st':'STATEFP', 'fips_cnty':'COUNTYFP'}, axis=1)
+dentist["STATEFP"] = dentist["STATEFP"].astype("string").str.zfill(2)
+dentist["COUNTYFP"] = dentist["COUNTYFP"].astype("string").str.zfill(3)
+dentist['FULLFIPS'] = dentist['STATEFP'].astype(str) + dentist['COUNTYFP']
+dentist=dentist.drop(['STATEFP','COUNTYFP'], axis=1)
+dentist=dentist.dropna() 
+
+
+
+dentpl1=pd.merge(placesfips, dentist, how="outer", on=['FULLFIPS'])
+dentpl1=dentpl1.dropna() 
+
+
+
+popclass=popclass.rename({"FIPS code":"FULLFIPS", "2013 code":"pop_code"}, axis=1)
+popclass['pop_code'] = popclass['pop_code'].astype(float)
+popclass["FULLFIPS"] = popclass["FULLFIPS"].astype("string").str.zfill(5)
+
+
+
+dentpl=pd.merge(dentpl1, popclass, how="outer", on=['FULLFIPS'])
+dentpl['pop_code'] = dentpl['pop_code'].astype('Int32')
+
+
+
+dentpl[dentpl.select_dtypes(np.float64).columns] = dentpl.select_dtypes(np.float64).astype(np.float32)
+dentpl[['dent_ratio']] = dentpl[['dent_npi_21']].div(dentpl.TotalPopulation, axis=0)
+dentpl[['dent_per_1000']]=dentpl[['dent_ratio']].multiply(1000)
+dentpl[['Data_Value_Num']] = dentpl[['Data_Value']].div(100)
+dentpl[['val_per_1000']]=dentpl[['Data_Value_Num']].multiply(1000)
+dentpl[['total_num']] = dentpl[['Data_Value_Num']].multiply(dentpl.TotalPopulation, axis=0)
+dentpl = dentpl.dropna() 
+
+
+
+dentpl_crude = dentpl.drop(dentpl[dentpl['Data_Value_Type'] == 'Age-adjusted prevalence'].index)
+dentpl_crude.drop(columns=['Data_Value_Type','STATEFP','COUNTYFP'], inplace=True)
+dentpl_crude=dentpl_crude.rename({'Year':'year','Measure':'measure','Data_Value_Unit':'data_value_unit','Data_Value':'data_value','TotalPopulation':'total_pop','FULLFIPS':'fips','CategoryID':'category_id','Short_Question_Text':'category','State':'state','County Name':'county','dent_npi_21':'num_dentists'}, axis=1)
+dentpl_crude = dentpl_crude[['fips','state','county','total_pop','pop_code','category','measure', 'category_id','data_value','data_value_unit','val_per_1000','num_dentists','dent_per_1000','year','lat','long','Geolocation']]
+
+
+
+def cond(dentpl_crude):    
+    if (dentpl_crude['pop_code'] == 1) or (dentpl_crude['pop_code'] == 2):
+        return 'urban'
+    elif (dentpl_crude['pop_code'] == 3) or (dentpl_crude['pop_code'] == 4):
+        return 'suburban'
+    elif (dentpl_crude['pop_code'] == 5) or (dentpl_crude['pop_code'] == 6):
+        return 'rural'
+
+dentpl_crude['pop_type'] = dentpl_crude.apply(cond, axis = 1)
+
+
+
+dentpl_crude_pivot = dentpl_crude.pivot_table('val_per_1000', ['fips','num_dentists','dent_per_1000','total_pop','pop_code','pop_type','lat','long','Geolocation','state','county'], 'category').reset_index().rename_axis('index',axis=1) 
+dentpl_crude_pivot[dentpl_crude_pivot.select_dtypes(np.float64).columns] = dentpl_crude_pivot.select_dtypes(np.float64).astype(np.float32)
+dentpl_crude_pivot.head()
+
+
+chattahoochee = dentpl_crude_pivot[(dentpl_crude_pivot['dent_per_1000']<8.5) & (dentpl_crude_pivot['dent_per_1000']>7.9)]
+chattahoochee
+
+
+
+dentpl_crude_pivot=dentpl_crude_pivot.drop(dentpl_crude_pivot[dentpl_crude_pivot['fips'] == '13053'].index)
+#removing chattahoochee for being weirdly overrun with dentists
+dentpl_crude_pivot = dentpl_crude_pivot.dropna() 
+#dropping NaNs drops all of florida because there is no data on them in the original dataset
+dentpl_crude_pivot.head()
+
+
+nix_la=dentpl_crude_pivot.drop(dentpl_crude_pivot[dentpl_crude_pivot['fips'] == '06037'].index)
+#removing LA for outlier reasons
+
+
+dcp_corr=nix_la.drop(['fips','pop_code','pop_type','lat','long','Geolocation','state','county'], axis=1)
+
+
+sns.set(style="ticks", color_codes=True)
+sns.pairplot(dcp_corr, kind='reg',plot_kws={'line_kws':{'color':'red'}})
+
+
+dcp_corr.corr()
+
+
+corr = dcp_corr.select_dtypes('number').corr()
+corr[np.abs(corr)<.2] = 0
+
+mask = np.triu(np.ones_like(corr.corr(), dtype=bool))
+
+sns.heatmap(corr,mask=mask,cmap="coolwarm", annot=True).set_title('Relationships of Interest')
+
+
+data=dentpl_crude.loc[dentpl_crude['category'].isin(['Dental Visit','Annual Checkup'])]
+sns.barplot(data=data,x = 'pop_code', y = "val_per_1000",
+            hue = "category", errorbar = None, palette='husl').set(title='Annual Checkups and Dental Visits by Area Type',xlabel='Population Type (1=Urban, 6=Rural)', ylabel='Value per 1000 people')
+
+
+
+popsns=sns.barplot(x = 'pop_code',
+            y = 'total_pop',
+            data = dentpl_crude_pivot,
+           errorbar = None,
+           color='lightcoral')
+plt.ticklabel_format(style='plain', axis='y')
+
+popsns.set_title('Population Across Area Types')
+popsns.set_xlabel('Population Type (1=Urban, 6=Rural)')
+popsns.set_ylabel('Total Population')
+
+
+
+typesns=sns.catplot(data=dentpl_crude_pivot, kind='count', x='pop_code',color = "darkseagreen",
+            saturation = 0.75).set(title='Number of Area Types',xlabel='Population Type (1=Urban, 6=Rural)', ylabel='Count of Area Type')
+
+
+
+g=sns.lmplot(x = 'Mental Health', y = 'Dental Visit',
+           col = "pop_type",hue = "pop_type",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Mental Health'], data['Dental Visit'])
+    ax = plt.gca()
+    ax.text(.05, .1, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+g.map_dataframe(annotate)
+g.fig.subplots_adjust(top = 0.8)
+g.fig.suptitle("Mental Health and Dental Visits by Population Type")
+plt.show()
+
+
+h=sns.lmplot(x = 'Mental Health', y = 'dent_per_1000',
+           col = "pop_type",hue = "pop_type",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Mental Health'], data['dent_per_1000'])
+    ax = plt.gca()
+    ax.text(.05, .8, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+h.map_dataframe(annotate)
+h.fig.subplots_adjust(top = 0.8)
+h.fig.suptitle("Mental Health and Dentist Availability by Population Type (minus Chattahoochee)")
+plt.show()
+
+
+
+n=sns.lmplot(x = 'Mental Health', y = 'dent_per_1000',
+           col = "pop_code",hue = "pop_code",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Mental Health'], data['dent_per_1000'])
+    ax = plt.gca()
+    ax.text(.05, .8, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+n.map_dataframe(annotate)
+n.fig.subplots_adjust(top = 0.8)
+n.fig.suptitle("Mental Health and Dentist Availability by Population Code (minus Chattahoochee)")
+plt.show()
+
+
+i=sns.lmplot(x = 'Mental Health', y = 'Health Insurance',
+           col = "pop_type",hue = "pop_type",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Mental Health'], data['Health Insurance'])
+    ax = plt.gca()
+    ax.text(.05, .8, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+i.map_dataframe(annotate)
+i.fig.subplots_adjust(top = 0.8)
+i.fig.suptitle("Mental Health and Health Insurance by Population Type")
+plt.show()
+
+
+j=sns.lmplot(x = 'Dental Visit', y = 'Health Insurance',
+           col = "pop_type",hue = "pop_type",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Dental Visit'], data['Health Insurance'])
+    ax = plt.gca()
+    ax.text(.05, .8, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+j.map_dataframe(annotate)
+j.fig.subplots_adjust(top = 0.8)
+j.fig.suptitle("Dental Visits and Health Insurance by Population Type")
+plt.show()
+
+
+k=sns.lmplot(x = 'Dental Visit', y = 'General Health',
+           col = "pop_type",hue = "pop_type",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Dental Visit'], data['General Health'])
+    ax = plt.gca()
+    ax.text(.05, .8, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+k.map_dataframe(annotate)
+k.fig.subplots_adjust(top = 0.8)
+k.fig.suptitle("Dental Visits and General Health by Population Type")
+plt.show()
+
+
+m=sns.lmplot(x = 'Dental Visit', y = 'dent_per_1000',
+           col = "pop_type",hue = "pop_type",palette = "husl",
+           line_kws = {"color": "red"},data = dentpl_crude_pivot)
+
+
+
+def annotate(data, **kws):
+    r, p = sp.stats.pearsonr(data['Dental Visit'], data['dent_per_1000'])
+    ax = plt.gca()
+    ax.text(.05, .8, 'r={:.2f}, p={:.2g}'.format(r, p),
+            transform=ax.transAxes)
+
+    
+m.map_dataframe(annotate)
+m.fig.subplots_adjust(top = 0.8)
+m.fig.suptitle("Dental Visits and Dentist Availability by Population Type")
+plt.show()
+
+
+stats.ttest_ind(dentpl_crude_pivot.dropna()['Mental Health'], dentpl_crude_pivot.dropna()['Dental Visit'])
+
+
+stats.ttest_ind(dentpl_crude_pivot.dropna()['Health Insurance'], dentpl_crude_pivot.dropna()['Dental Visit'])
+
+
+#Looking at chi squared between Mental Health "grade" (bins set at std) and type of population distribution (urban, rural, etc)
+bins=[100,128.8,154.6,180.4,206.2,233]
+binspop=[0,2,4,6]
+dentpl_crude_pivot['mental_health_grade']=pd.cut(dentpl_crude_pivot['Mental Health'],bins=bins, labels=['A','B','C','D','F'])
+dentpl_crude_pivot['pop_new']=pd.cut(dentpl_crude_pivot['pop_code'],bins=binspop, labels=['urban','sub','rural'])
+
+
+df_chi=pd.crosstab(dentpl_crude_pivot['pop_new'],dentpl_crude_pivot['mental_health_grade'])
+
+
+
+d=chi2_contingency(df_chi)
+
+stats, p_value, a, b=d
+
+alpha=0.05
+if p_value>alpha:
+    print (f'p value as {p_value,10}, variables are independant (not related)')
+else: print (f'p value as {p_value}, variables are dependant (related)')
+
+
+#Looking at chi squared between Dental Visits "grade" (bins set at std) and type of population distribution (urban, rural, etc)
+bins2=[335,430,524,618,712,810]
+dentpl_crude_pivot['dental_visit_grade']=pd.cut(dentpl_crude_pivot['Dental Visit'],bins=bins2, labels=['F','D','C','B','A'])
+
+
+df_chi2=pd.crosstab(dentpl_crude_pivot['pop_new'],dentpl_crude_pivot['dental_visit_grade'])
+
+from scipy.stats import chi2_contingency
+
+d2=chi2_contingency(df_chi2)
+
+stats, p_value, a, b=d2
+
+alpha=0.05
+if p_value>alpha:
+    print (f'p value as {p_value,10}, variables are independant (not related)')
+else: print (f'p value as {p_value}, variables are dependant (related)')
+
+
+#Looking at chi squared between Dentists per 1000 "Level" (bins set at std) and Dental Visits (bins set around 157 deviation)bins3=[0,0.34,0.67,10]
+dentpl_crude_pivot['dent_new']=pd.cut(dentpl_crude_pivot['dent_per_1000'],bins=bins3, labels=['few','some','many'])
+
+
+df_chi3=pd.crosstab(dentpl_crude_pivot['dent_new'],dentpl_crude_pivot['dental_visit_grade'])
+
+from scipy.stats import chi2_contingency
+
+d3=chi2_contingency(df_chi3)
+
+stats, p_value, a, b=d3
+
+alpha=0.05
+if p_value>alpha:
+    print (f'p value as {p_value,10}, variables are independant (not related)')
+else: print (f'p value as {p_value}, variables are dependant (related)')
+
+
+#Looking at chi squared between Dentists per 1000 "Level" (bins set at std) and Mental Health "level" (bins set around 43 deviation)
+df_chi4=pd.crosstab(dentpl_crude_pivot['dent_new'],dentpl_crude_pivot['mental_health_grade'])
+
+from scipy.stats import chi2_contingency
+
+d4=chi2_contingency(df_chi4)
+
+stats, p_value, a, b=d4
+
+alpha=0.05
+if p_value>alpha:
+    print (f'p value as {p_value,10}, variables are independant (not related)')
+else: print (f'p value as {p_value}, variables are dependant (related)')
+
+
+dentpl_crude_pivot=dentpl_crude_pivot.drop(['dent_new'], axis=1)
+
+
+dentna=dentpl_crude_pivot
+dentna['pop_code'] = dentna['pop_code'].astype(str)
+
+
+colorscale=['#1e90ff','#32cd32','#ffff76','#ffa500','#ff0000']
+fig = ff.create_choropleth(fips=dentna['fips'], 
+                           scope=['usa'],
+                           values=dentna['mental_health_grade'],
+                           county_outline={'color': 'rgb(0,0,0)', 'width': 0.3},
+                           colorscale=colorscale,
+                           title='Mental Health by County', 
+                           legend_title='Mental Health Grade')
+
+fig.layout.template = None
+fig
+
+
+fig6 = ff.create_choropleth(fips=dentna['fips'], 
+                           scope=['usa'],
+                           values=dentna['dental_visit_grade'],
+                           county_outline={'color': 'rgb(0,0,0)', 'width': 0.3}, 
+                            colorscale=colorscale,
+                           title='Dental Visits by County', 
+                           legend_title='Dental Visit Grade')
+
+fig6.layout.template = None
+fig6
+
+
+df_md = dentna[dentna['state'] == 'Maryland']
+fig8 = ff.create_choropleth(fips=df_md['fips'], 
+                           scope=['Maryland'],
+                           values=df_md['mental_health_grade'],
+                           county_outline={'color': 'rgb(0,0,0)', 'width': 0.80}, 
+                            colorscale=colorscale,
+                           title='Mental Health by County', 
+                           legend_title='Mental Health Grade',
+                            show_state_data=True,
+                           show_hover=True)
+
+fig8.layout.template = None
+fig8
+
+
+fig7 = ff.create_choropleth(fips=df_md['fips'], 
+                           scope=['Maryland'],
+                           values=df_md['dental_visit_grade'],
+                           county_outline={'color': 'rgb(0,0,0)', 'width': 0.8}, 
+                            colorscale=colorscale,
+                           title='Dental Visits by County', 
+                           legend_title='Dental Visit Grade')
+
+fig7.layout.template = None
+fig7
+
+
+
+bins8=[34,69,103,137,171,476]
+dentna['health_insurance_grade']=pd.cut(dentna['Health Insurance'],bins=bins8, labels=['A','B','C','D','F'])
+dentna.head()
+
+
+
+fig3 = px.scatter_geo(dentna,
+                    lat=dentna['lat'],
+                    lon=dentna['long'],
+                    size="dent_per_1000",
+                    category_orders={'health_insurance_grade':['A','B','C','D','F']},
+                    color='health_insurance_grade',
+                    color_discrete_sequence=["blue", "green", "yellow", "orange", "red"],
+                    hover_name='county',
+                     hover_data=["Mental Health", "Dental Visit", 'mental_health_grade','dental_visit_grade'])
+
+fig3.update_layout(
+        title = 'Densists per 1000 people and Health Insurance',
+        geo_scope='usa',
+        template="plotly_dark",
+        legend_title="Health Insurance Grade"
+    )
+
+fig3
