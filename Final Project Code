@@ -138,6 +138,12 @@ nix_la=dentpl_crude_pivot.drop(dentpl_crude_pivot[dentpl_crude_pivot['fips'] == 
 dcp_corr=nix_la.drop(['fips','pop_code','pop_type','lat','long','Geolocation','state','county'], axis=1)
 
 
+dcp_corr[['num_dentists','dent_per_1000','Annual Checkup','Dental Visit','General Health','Health Insurance','Mental Health']].hist(alpha=0.5)
+plt.xlabel('Value')
+plt.ylabel('Frequency')
+plt.title("all")
+
+
 sns.set(style="ticks", color_codes=True)
 sns.pairplot(dcp_corr, kind='reg',plot_kws={'line_kws':{'color':'red'}})
 
