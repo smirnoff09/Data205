@@ -357,8 +357,9 @@ if p_value>alpha:
 else: print (f'p value as {p_value}, variables are dependant (related)')
 
 
-#Looking at chi squared between Dentists per 1000 "Level" (bins set at std) and Dental Visits (bins set around 157 deviation)bins3=[0,0.34,0.67,10]
-dentpl_crude_pivot['dent_new']=pd.cut(dentpl_crude_pivot['dent_per_1000'],bins=bins3, labels=['few','some','many'])
+#Looking at chi squared between Dentists per 1000 "Level" (bins set atabout .2) and Dental Visits
+bins3=[0,0.18,0.38,0.58,0.78,3.4]
+dentpl_crude_pivot['dent_new']=pd.cut(dentpl_crude_pivot['dent_per_1000'],bins=bins3, labels=['F (0-0.18)','D (0.19-0.38)','C (0.39-0.58)','B (0.59-0.78)','A (0.79-3.4)'], include_lowest=True)
 
 
 df_chi3=pd.crosstab(dentpl_crude_pivot['dent_new'],dentpl_crude_pivot['dental_visit_grade'])
@@ -374,8 +375,10 @@ if p_value>alpha:
     print (f'p value as {p_value,10}, variables are independant (not related)')
 else: print (f'p value as {p_value}, variables are dependant (related)')
 
+#Looking at chi squared between Dentists per 1000 "Level" and Dental Visits
+bins3=[0,0.34,0.67,10]
 
-#Looking at chi squared between Dentists per 1000 "Level" (bins set at std) and Mental Health "level" (bins set around 43 deviation)
+#Looking at chi squared between Dentists per 1000 "Level"and Mental Health "level"
 df_chi4=pd.crosstab(dentpl_crude_pivot['dent_new'],dentpl_crude_pivot['mental_health_grade'])
 
 from scipy.stats import chi2_contingency
