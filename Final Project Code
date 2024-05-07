@@ -459,13 +459,13 @@ dentna.head()
 
 
 
+
 fig3 = px.scatter_geo(dentna,
                     lat=dentna['lat'],
                     lon=dentna['long'],
-                    size="dent_per_1000",
-                    category_orders={'health_insurance_grade':['A','B','C','D','F']},
-                    color='health_insurance_grade',
-                    color_discrete_sequence=["blue", "green", "yellow", "orange", "red"],
+                    color='dent_per_1000',
+                    color_continuous_scale=["red", 'orange',"yellow","green",'blue','purple'],
+                    size="Health Insurance",
                     hover_name='county',
                      hover_data=["Mental Health", "Dental Visit", 'mental_health_grade','dental_visit_grade'])
 
