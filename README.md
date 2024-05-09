@@ -1,7 +1,7 @@
 # Data205
 
 
-### QUICK NOTE ABOUT THE CODING! I DID THE PROJECT IN JUPYTERLABS. TOWRDS THE END EVERYHTING KIND OF BROKE AND I HAD TO UNINSTALL AND REINSTALL CONDA. DOING THAT DID something AND WHEN I GOT THE CODE BACK IN AND RERAN ALL THE CELLS, SOME OF THEM  DIDN'T WORK EVEN THOUGH THEY WORKED JUST FINE IN THE FIRST PLACE. I DON'T KNOW WHAT WENT WRONG AND I DIDN'T REALLY HAVE TIME TO FIX THEM SO THE CODE YOU SEE IS THE ORIGINAL CODE AND ALL OF THE ERRORS WERE NOT PRESENT IN THE ORIGINAL DOCUMENT.
+##### QUICK NOTE ABOUT THE CODING! I DID THE PROJECT IN JUPYTERLABS. TOWRDS THE END EVERYHTING KIND OF BROKE AND I HAD TO UNINSTALL AND REINSTALL CONDA (I TOOK SCREENSHOTS OF ALL MY VISUALIZATIONS JUST IN CASE). DOING THAT DID something AND WHEN I GOT THE CODE BACK IN AND RERAN ALL THE CELLS, SOME OF THEM  DIDN'T WORK EVEN THOUGH THEY WORKED JUST FINE IN THE FIRST PLACE. I DON'T KNOW WHAT WENT WRONG AND I DIDN'T REALLY HAVE TIME TO FIX THEM SO THE CODE YOU SEE IS THE ORIGINAL CODE AND ALL OF THE ERRORS WERE NOT PRESENT IN THE ORIGINAL DOCUMENT.
  
 THE TEETH, THE BRAIN, AND THE SOCIOECONOMIC INEQUALITIES?
 
@@ -10,7 +10,7 @@ our dental health, and how we got here. We'll dive into statistics, graphs,
 and maps and see what the story is. I don't promise any answers, but I do promise
 you'll go "Hmmmm. Well thats a weird little thing".
 
-DATASETS:
+###### DATASETS:
 
 CDC PLACES Data
 
@@ -37,7 +37,7 @@ https://www.census.gov/library/reference/code-lists/ansi.html
 For standardizing merging and visualizing purposes.
 
 
-ADDITIONAL READINGS
+###### ADDITIONAL READINGS
 
 PLACES measure definitions: descriptions on what and how all columns are.
 https://www.cdc.gov/places/measure-definitions/index.html
@@ -46,3 +46,9 @@ https://www.cdc.gov/places/measure-definitions/index.html
 Classification definitions: descriptions about area types and calculations.
 https://www.cdc.gov/nchs/data/series/sr_02/sr02_166.pdf
 
+
+###### DOCUMENTS IN REPOSITORY
+
+All datasets except for PLACES dataset which was too big. You can find it on the CDC webiste following the link above.
+
+Final python code. Read note above for giant disclaimer.
