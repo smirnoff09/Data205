@@ -52,3 +52,5 @@ https://www.cdc.gov/nchs/data/series/sr_02/sr02_166.pdf
 All datasets except for PLACES dataset which was too big. You can find it on the CDC webiste following the link above.
 
 Final python code. Read note above for giant disclaimer.
+
+Data Sory document. It's the data story.
